@@ -2,6 +2,9 @@
 #include <mls/crypto.h>
 #include <mls/messages.h>
 #include <namespace.h>
+#include <hpke/openssl/openssl_provider.h>
+#include <iostream>
+#include <cassert>
 
 #include <string>
 
@@ -42,13 +45,20 @@ tls_signature_scheme(Signature::ID id)
 ///
 
 CipherSuite::CipherSuite()
-  : id(ID::unknown)
+  : id(ID::unknown), provider(std::make_shared<hpke::openssl::OpenSSLProvider>(ID::unknown))
 {
 }
 
-CipherSuite::CipherSuite(ID id_in)
+CipherSuite::CipherSuite(ID id_in, std::shared_ptr<hpke::Provider> provider)
   : id(id_in)
 {
+  if (provider == nullptr) {
+    std::cout << "Using builtin provider" << std::endl;
+    this->provider = std::make_shared<hpke::openssl::OpenSSLProvider>(id_in);
+  } else {
+    std::cout << "Using builtin provider" << std::endl;
+    this->provider = std::move(provider);
+  }
 }
 
 SignatureScheme
@@ -72,98 +82,6 @@ CipherSuite::signature_scheme() const
   }
 }
 
-const CipherSuite::Ciphers&
-CipherSuite::get() const
-{
-  static const auto ciphers_X25519_AES128GCM_SHA256_Ed25519 =
-    CipherSuite::Ciphers{
-      HPKE(KEM::ID::DHKEM_X25519_SHA256,
-           KDF::ID::HKDF_SHA256,
-           AEAD::ID::AES_128_GCM),
-      Digest::get<Digest::ID::SHA256>(),
-      Signature::get<Signature::ID::Ed25519>(),
-    };
-
-  static const auto ciphers_P256_AES128GCM_SHA256_P256 = CipherSuite::Ciphers{
-    HPKE(
-      KEM::ID::DHKEM_P256_SHA256, KDF::ID::HKDF_SHA256, AEAD::ID::AES_128_GCM),
-    Digest::get<Digest::ID::SHA256>(),
-    Signature::get<Signature::ID::P256_SHA256>(),
-  };
-
-  static const auto ciphers_X25519_CHACHA20POLY1305_SHA256_Ed25519 =
-    CipherSuite::Ciphers{
-      HPKE(KEM::ID::DHKEM_X25519_SHA256,
-           KDF::ID::HKDF_SHA256,
-           AEAD::ID::CHACHA20_POLY1305),
-      Digest::get<Digest::ID::SHA256>(),
-      Signature::get<Signature::ID::Ed25519>(),
-    };
-
-  static const auto ciphers_P521_AES256GCM_SHA512_P521 = CipherSuite::Ciphers{
-    HPKE(
-      KEM::ID::DHKEM_P521_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
-    Digest::get<Digest::ID::SHA512>(),
-    Signature::get<Signature::ID::P521_SHA512>(),
-  };
-
-  static const auto ciphers_P384_AES256GCM_SHA384_P384 = CipherSuite::Ciphers{
-    HPKE(
-      KEM::ID::DHKEM_P384_SHA384, KDF::ID::HKDF_SHA384, AEAD::ID::AES_256_GCM),
-    Digest::get<Digest::ID::SHA384>(),
-    Signature::get<Signature::ID::P384_SHA384>(),
-  };
-
-#if !defined(WITH_BORINGSSL)
-  static const auto ciphers_X448_AES256GCM_SHA512_Ed448 = CipherSuite::Ciphers{
-    HPKE(
-      KEM::ID::DHKEM_X448_SHA512, KDF::ID::HKDF_SHA512, AEAD::ID::AES_256_GCM),
-    Digest::get<Digest::ID::SHA512>(),
-    Signature::get<Signature::ID::Ed448>(),
-  };
-
-  static const auto ciphers_X448_CHACHA20POLY1305_SHA512_Ed448 =
-    CipherSuite::Ciphers{
-      HPKE(KEM::ID::DHKEM_X448_SHA512,
-           KDF::ID::HKDF_SHA512,
-           AEAD::ID::CHACHA20_POLY1305),
-      Digest::get<Digest::ID::SHA512>(),
-      Signature::get<Signature::ID::Ed448>(),
-    };
-#endif
-
-  switch (id) {
-    case ID::unknown:
-      throw InvalidParameterError("Uninitialized ciphersuite");
-
-    case ID::X25519_AES128GCM_SHA256_Ed25519:
-      return ciphers_X25519_AES128GCM_SHA256_Ed25519;
-
-    case ID::P256_AES128GCM_SHA256_P256:
-      return ciphers_P256_AES128GCM_SHA256_P256;
-
-    case ID::X25519_CHACHA20POLY1305_SHA256_Ed25519:
-      return ciphers_X25519_CHACHA20POLY1305_SHA256_Ed25519;
-
-    case ID::P521_AES256GCM_SHA512_P521:
-      return ciphers_P521_AES256GCM_SHA512_P521;
-
-    case ID::P384_AES256GCM_SHA384_P384:
-      return ciphers_P384_AES256GCM_SHA384_P384;
-
-#if !defined(WITH_BORINGSSL)
-    case ID::X448_AES256GCM_SHA512_Ed448:
-      return ciphers_X448_AES256GCM_SHA512_Ed448;
-
-    case ID::X448_CHACHA20POLY1305_SHA512_Ed448:
-      return ciphers_X448_CHACHA20POLY1305_SHA512_Ed448;
-#endif
-
-    default:
-      throw InvalidParameterError("Unsupported ciphersuite");
-  }
-}
-
 struct HKDFLabel
 {
   uint16_t length;
@@ -182,7 +100,7 @@ CipherSuite::expand_with_label(const bytes& secret,
   auto mls_label = from_ascii(std::string("MLS 1.0 ") + label);
   auto length16 = static_cast<uint16_t>(length);
   auto label_bytes = tls::marshal(HKDFLabel{ length16, mls_label, context });
-  return get().hpke.kdf.expand(secret, label_bytes, length);
+  return provider->hpke().kdf.expand(secret, label_bytes, length);
 }
 
 bytes
