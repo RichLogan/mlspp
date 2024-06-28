@@ -3,7 +3,6 @@
 #include <mls/messages.h>
 #include <namespace.h>
 #include <hpke/openssl/openssl_provider.h>
-#include <iostream>
 #include <cassert>
 
 #include <string>
@@ -53,15 +52,16 @@ CipherSuite::CipherSuite(ID id_in, std::shared_ptr<hpke::Provider> provider)
   : id(id_in)
 {
   if (id_in == ID::unknown) {
-    // Provider will be initialized later using set_provider_from.
+    // TODO: (rilogan) I don't like this.
+    // In the case of deserialization, provider will be initialized later using set_provider_from.
     return;
   }
   if (provider == nullptr) {
-    // TODO: Compile time opt out.
-    // Default to built in provider.
+    // TODO: Add compile time opt out of default provider inclusion.
+    // Default to built in provider (for backwards compatibility).
     this->provider = std::make_shared<hpke::openssl::OpenSSLProvider>(id);
   } else {
-    // Set custom provider.
+    // Set the custom provider.
     this->provider = std::move(provider);
   }
 }
