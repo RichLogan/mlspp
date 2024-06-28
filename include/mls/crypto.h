@@ -45,19 +45,21 @@ struct CipherSuite
 {
   using ID = hpke::Provider::ID;
   CipherSuite();
-  CipherSuite(ID id_in, std::shared_ptr<hpke::Provider> provider_in = nullptr);
+  CipherSuite(ID id_in, std::shared_ptr<hpke::Provider> provider = nullptr);
 
+  void set_provider_from(const CipherSuite& suite);
+  std::optional<std::shared_ptr<hpke::Provider>> get_provider() const { return provider; }
   ID cipher_suite() const { return id; }
   SignatureScheme signature_scheme() const;
 
-  size_t secret_size() const { return provider->digest().hash_size; }
-  size_t key_size() const { return provider->hpke().aead.key_size; }
-  size_t nonce_size() const { return provider->hpke().aead.nonce_size; }
+  size_t secret_size() const { return provider.value()->digest().hash_size; }
+  size_t key_size() const { return provider.value()->hpke().aead.key_size; }
+  size_t nonce_size() const { return provider.value()->hpke().aead.nonce_size; }
 
   bytes zero() const { return bytes(secret_size(), 0); }
-  const hpke::HPKE& hpke() const { return provider->hpke(); }
-  const hpke::Digest& digest() const { return provider->digest(); }
-  const hpke::Signature& sig() const { return provider->sig(); }
+  const hpke::HPKE& hpke() const { return provider.value()->hpke(); }
+  const hpke::Digest& digest() const { return provider.value()->digest(); }
+  const hpke::Signature& sig() const { return provider.value()->sig(); }
 
   bytes expand_with_label(const bytes& secret,
                           const std::string& label,
@@ -92,7 +94,7 @@ struct CipherSuite
 
 private:
   ID id;
-  std::shared_ptr<hpke::Provider> provider;
+  std::optional<std::shared_ptr<hpke::Provider>> provider;
 
   template<typename T>
   static const bytes& reference_label();

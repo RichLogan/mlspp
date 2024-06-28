@@ -45,20 +45,32 @@ tls_signature_scheme(Signature::ID id)
 ///
 
 CipherSuite::CipherSuite()
-  : id(ID::unknown), provider(std::make_shared<hpke::openssl::OpenSSLProvider>(ID::unknown))
+  : id(ID::unknown)
 {
 }
 
 CipherSuite::CipherSuite(ID id_in, std::shared_ptr<hpke::Provider> provider)
   : id(id_in)
 {
+  if (id_in == ID::unknown) {
+    // Provider will be initialized later using set_provider_from.
+    return;
+  }
   if (provider == nullptr) {
-    std::cout << "Using builtin provider" << std::endl;
-    this->provider = std::make_shared<hpke::openssl::OpenSSLProvider>(id_in);
+    // TODO: Compile time opt out.
+    // Default to built in provider.
+    this->provider = std::make_shared<hpke::openssl::OpenSSLProvider>(id);
   } else {
-    std::cout << "Using builtin provider" << std::endl;
+    // Set custom provider.
     this->provider = std::move(provider);
   }
+}
+
+void CipherSuite::set_provider_from(const CipherSuite& suite)
+{
+  assert(!this->provider.has_value());
+  assert(suite.get_provider().has_value());
+  this->provider = suite.get_provider();
 }
 
 SignatureScheme
@@ -100,7 +112,7 @@ CipherSuite::expand_with_label(const bytes& secret,
   auto mls_label = from_ascii(std::string("MLS 1.0 ") + label);
   auto length16 = static_cast<uint16_t>(length);
   auto label_bytes = tls::marshal(HKDFLabel{ length16, mls_label, context });
-  return provider->hpke().kdf.expand(secret, label_bytes, length);
+  return provider.value()->hpke().kdf.expand(secret, label_bytes, length);
 }
 
 bytes

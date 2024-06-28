@@ -1,6 +1,7 @@
 #include <mls/messages.h>
 #include <mls/session.h>
 #include <namespace.h>
+#include <hpke/provider.h>
 
 #include <deque>
 
@@ -44,7 +45,8 @@ struct Session::Inner
                       const HPKEPrivateKey& leaf_priv,
                       const SignaturePrivateKey& sig_priv,
                       const KeyPackage& key_package,
-                      const bytes& welcome_data);
+                      const bytes& welcome_data,
+                      const CipherSuite& suite);
 
   bytes fresh_secret() const;
   MLSMessage import_handshake(const bytes& encoded) const;
@@ -147,7 +149,8 @@ PendingJoin::complete(const bytes& welcome) const
                               inner->leaf_priv,
                               inner->sig_priv,
                               inner->key_package,
-                              welcome);
+                              welcome,
+                              inner->suite);
 }
 
 ///
@@ -177,9 +180,11 @@ Session::Inner::join(const HPKEPrivateKey& init_priv,
                      const HPKEPrivateKey& leaf_priv,
                      const SignaturePrivateKey& sig_priv,
                      const KeyPackage& key_package,
-                     const bytes& welcome_data)
+                     const bytes& welcome_data,
+                     const CipherSuite& suite)
 {
   auto welcome = tls::get<Welcome>(welcome_data);
+  welcome.cipher_suite.set_provider_from(suite);
 
   auto state = State(
     init_priv, leaf_priv, sig_priv, key_package, welcome, std::nullopt, {});
@@ -254,6 +259,7 @@ bytes
 Session::add(const bytes& key_package_data)
 {
   auto key_package = tls::get<KeyPackage>(key_package_data);
+  key_package.cipher_suite.set_provider_from(cipher_suite());
   auto proposal = inner->history.front().add(
     key_package, { inner->encrypt_handshake, {}, 0 });
   return tls::marshal(proposal);

@@ -1249,7 +1249,19 @@ State::cache_proposal(AuthenticatedContent content_auth)
     sender_location = var::get<MemberSender>(sender).sender;
   }
 
-  const auto& proposal = var::get<Proposal>(content_auth.content.content);
+  auto& proposal = var::get<Proposal>(content_auth.content.content);
+  // TODO: rilogan - sus.
+  if (auto add = std::get_if<Add>(&proposal.content)) {
+    auto provider = add->key_package.cipher_suite.get_provider();
+    if (!provider) {
+      add->key_package.cipher_suite.set_provider_from(_suite);
+    }
+  } else if (auto reinit = std::get_if<ReInit>(&proposal.content)) {
+    auto provider = reinit->cipher_suite.get_provider();
+    if (!provider) {
+      reinit->cipher_suite.set_provider_from(_suite);
+    }
+  }
   if (!valid(sender_location, proposal)) {
     throw ProtocolError("Invalid proposal");
   }

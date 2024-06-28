@@ -192,7 +192,9 @@ Welcome::decrypt(const bytes& joiner_secret,
     throw ProtocolError("Welcome decryption failed");
   }
 
-  return tls::get<GroupInfo>(opt::get(group_info_data));
+  GroupInfo group_info = tls::get<GroupInfo>(opt::get(group_info_data));
+  group_info.group_context.cipher_suite.set_provider_from(cipher_suite);
+  return group_info;
 }
 
 KeyAndNonce
