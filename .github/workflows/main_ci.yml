@@ -38,7 +38,7 @@ jobs:
         crypto: [openssl_1.1, openssl_3, boringssl]
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
+      BUILD_DIR: "${{ runner.temp }}/build_${{ matrix.crypto }}"
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_openssl_1.1"
+      BUILD_DIR: "${{ runner.temp }}/build_openssl_1.1"
       CRYPTO_DIR: "./alternatives/openssl_1.1"
 
     steps:
@@ -118,7 +118,7 @@ jobs:
         crypto: [openssl_1.1, openssl_3, boringssl]
 
     env:
-      BUILD_DIR: "${RUNNER_TEMP}/build_${{ matrix.crypto }}"
+      BUILD_DIR: "${{ runner.temp }}/build_${{ matrix.crypto }}"
       CRYPTO_DIR: "./alternatives/${{ matrix.crypto }}"
 
     steps:
